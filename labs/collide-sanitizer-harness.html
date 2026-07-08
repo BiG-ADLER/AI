@@ -1,0 +1,103 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>collide sanitizer harness</title>
+<div id="preview"></div>
+<pre id="out"></pre>
+<script>
+(function () {
+  const ALLOWED_ELEMENTS = new Set([
+    'a', 'abbr', 'address', 'article', 'aside', 'b', 'bdi', 'bdo', 'blockquote',
+    'br', 'caption', 'cite', 'code', 'col', 'colgroup', 'data', 'dd', 'del',
+    'details', 'dfn', 'div', 'dl', 'dt', 'em', 'figcaption', 'figure', 'footer',
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr', 'i', 'img', 'ins',
+    'kbd', 'li', 'main', 'mark', 'nav', 'ol', 'p', 'pre', 'q', 'rb', 'rp',
+    'rt', 'rtc', 'ruby', 's', 'samp', 'section', 'small', 'span', 'strong',
+    'sub', 'summary', 'sup', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead',
+    'time', 'tr', 'u', 'ul', 'var', 'wbr',
+    'svg', 'g', 'defs', 'use', 'title', 'desc',
+    'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path',
+    'text', 'tspan', 'textpath', 'image',
+  ]);
+  const HARD_DENY = new Set([
+    'script', 'iframe', 'frame', 'frameset', 'object', 'embed', 'style',
+    'link', 'meta', 'base', 'noscript', 'template', 'audio', 'video',
+    'form', 'input', 'button', 'textarea', 'select', 'option',
+    'animate', 'animatetransform', 'animatemotion', 'set',
+  ]);
+  const HARD_DENY_ATTRS = new Set([
+    'srcdoc', 'sandbox', 'allow', 'formaction', 'background',
+    'ping', 'http-equiv',
+  ]);
+  function isJavaScriptUrl(value) {
+    if (!value) return false;
+    var s = String(value);
+    s = s.replace(/[\t\n\r]/g, '');
+    while (s.length > 0 && s.charCodeAt(0) <= 32) s = s.slice(1);
+    return s.toLowerCase().indexOf('javascript:') === 0;
+  }
+  function scrubUrlAttributes(el) {
+    const attrs = Array.from(el.attributes);
+    for (let i = 0; i < attrs.length; i++) {
+      const a = attrs[i];
+      const n = a.name.toLowerCase();
+      if (n === 'href' || n === 'xlink:href' || n.endsWith(':href') || n === 'src') {
+        if (isJavaScriptUrl(a.value)) el.removeAttribute(a.name);
+      }
+    }
+  }
+  function sanitize(root) {
+    const drop = [];
+    const walker = (root.ownerDocument || document).createTreeWalker(
+      root, NodeFilter.SHOW_ELEMENT
+    );
+    let n;
+    while ((n = walker.nextNode())) {
+      const tag = n.tagName ? n.tagName.toLowerCase() : '';
+      if (HARD_DENY.has(tag)) { drop.push(n); continue; }
+      if (!ALLOWED_ELEMENTS.has(tag)) { drop.push(n); continue; }
+      const attrs = Array.from(n.attributes);
+      for (let i = 0; i < attrs.length; i++) {
+        const a = attrs[i];
+        const an = a.name.toLowerCase();
+        if (an.indexOf('on') === 0) n.removeAttribute(a.name);
+        else if (HARD_DENY_ATTRS.has(an)) n.removeAttribute(a.name);
+      }
+      scrubUrlAttributes(n);
+    }
+    drop.forEach(function (el) { try { el.remove(); } catch (_) {} });
+  }
+  window.setHTML = function setHTML(targetEl, raw) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = String(raw);
+    sanitize(tpl.content);
+    targetEl.replaceChildren(tpl.content);
+  };
+})();
+
+const payloads = [
+  '<img src=x onerror=hit("img-onerror")>',
+  '<svg onload=hit("svg-onload")></svg>',
+  '<a href="javascript:hit(1)">x</a>',
+  '<details open ontoggle=hit("toggle")><summary>x</summary></details>',
+  '<svg><image href=x onerror=hit("svg-image-error")></image></svg>',
+  '<math><mtext><table><mglyph><style><!--</style><img src=x onerror=hit("mxss1")>--></mglyph></table></mtext></math>',
+  '<svg><p><style><img src=x onerror=hit("mxss2")></style></p></svg>',
+  '<svg><style><!--</style><img src=x onerror=hit("mxss3")>--></svg>',
+  '<svg><desc><![CDATA[</desc><img src=x onerror=hit("cdata")>]]></desc></svg>',
+  '<svg><title></title><img src=x onerror=hit("svg-img")></svg>'
+];
+
+(async function run() {
+  const rows = [];
+  for (const payload of payloads) {
+    window.fired = false;
+    window.hit = function (value) { window.fired = value || true; };
+    const preview = document.getElementById('preview');
+    preview.replaceChildren();
+    setHTML(preview, payload);
+    await new Promise(resolve => setTimeout(resolve, 80));
+    rows.push({ payload, fired: window.fired, html: preview.innerHTML });
+  }
+  document.getElementById('out').textContent = JSON.stringify(rows, null, 2);
+})();
+</script>

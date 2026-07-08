@@ -1,0 +1,10 @@
+{
+  "hits": [
+    {
+      "name": "css_bg_url",
+      "marker": "30_css_bg_url_1781152075789",
+      "url": "https://ab70eeb2cb7d.pwnbox-lab.com/p/3f4af6d554e10cf0be76abeb",
+      "payload": "<p style=\"background:url(https://webhook.site/ddf6fab2-1890-49b7-a513-247891377637?m=30_css_bg_url_1781152075789)\">x</p>"
+    }
+  ]
+}

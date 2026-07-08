@@ -1,0 +1,21 @@
+do not use this file this is for me and only me
+
+1. Work inside labs/ while solving.
+2. Move clean lessons to notes/.
+3. Move reusable tests to payloads/.
+4. Add process improvements to checklists/.
+5. Put final solved explanation in writeups/.
+6. Put real target data in targets/.
+7. Put submit-ready bugs in reports/.
+
+
+
+
+notes      = knowledge
+labs       = active practice
+writeups   = solved lessons
+payloads   = reusable tests
+checklists = process
+scripts    = tools
+targets    = private real-world work
+reports    = final submissions
