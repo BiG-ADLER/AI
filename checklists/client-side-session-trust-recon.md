@@ -28,6 +28,7 @@ Identify:
 - what the success response contains
 - whether the browser stores the whole response
 - whether cookies, `localStorage`, or `sessionStorage` are used
+- whether a **remember-me** checkbox triggers client-side cookie construction
 
 Record:
 
@@ -36,8 +37,22 @@ Login method:
 Login body shape:
 Response JSON:
 Browser storage key:
+Remember-me present: yes/no
+Remember-me built in JS: yes/no
 Server-side session cookie present: yes/no
 ```
+
+## 2b. Remember-Me / MD5 Cookie Construction (when present)
+
+If login HTML or JS references `md5`, `calcMD5`, `rc`, or hidden key fields:
+
+- [ ] Extract any key/expiry/username from hidden inputs or `localStorage`
+- [ ] Reconstruct `rc` / remember cookie formula against your own account
+- [ ] Check whether the key is shared across users
+- [ ] Enumerate other user ids/usernames (IDOR on profile/info APIs)
+- [ ] Forge victim `userid` + `username` + MAC cookie and hit `/login` or auto-restore
+
+See: `notes/remember-me-client-md5-cookie-forge.md`, `payloads/auth/remember-me-md5-rc-cookie-forge.md`
 
 ## 3. Map The Privileged Request Path
 
@@ -122,6 +137,7 @@ Examples:
 
 - [ ] Login flow mapped.
 - [ ] Browser storage location identified.
+- [ ] Remember-me / client MAC cookie checked if present.
 - [ ] Protected request path identified.
 - [ ] Low-privilege control confirmed.
 - [ ] One-field mutation tested.

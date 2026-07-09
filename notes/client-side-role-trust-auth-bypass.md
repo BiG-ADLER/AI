@@ -118,3 +118,7 @@ Unsigned custom session headers should be rejected.
 ## Future Checklist Item
 
 When a frontend stores a whole session object in browser storage, inspect every privileged request path for direct replay into headers or bodies before spending time on password attacks or SQLi.
+
+## Related Pattern
+
+Client-built **remember-me** cookies that MAC `userid|username` with a key embedded in login HTML are the same trust failure in cookie form. See `notes/remember-me-client-md5-cookie-forge.md`.

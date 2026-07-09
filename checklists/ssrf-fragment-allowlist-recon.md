@@ -85,12 +85,16 @@ Before fragment tests, quickly rule in or out:
 
 ```text
 https://[allowed]@127.0.0.1:[port]/
+http://127.0.0.1:[port]@[allowed]/
+http://127.0.0.1:[port]\[@][allowed]/
 http://127.0.0.1:[port]/[allowed-as-path]
 https://127.0.0.1:[port]/?[allowed]
 http://[decimal-ip]:[port]/
 ```
 
 Record which families are blocked and whether failures happen before fetch.
+
+If fragment fails but backslash-`@` works, see `notes/ssrf-backslash-userinfo-allowlist-bypass.md`.
 
 ## 6. Test Fragment Allowlist Smuggling
 
