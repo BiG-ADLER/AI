@@ -80,6 +80,28 @@ Script preserved: yes/no
 Served from app origin: yes/no
 ```
 
+## 4b. Test Parser-Failure SVG When Copy Mentions Unreadable Inputs
+
+If the app hints that some uploads are processed while unreadable ones are "left alone," upload intentionally malformed SVG:
+
+```xml
+<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script>
+```
+
+Fetch stored object and compare with the well-formed case:
+
+```bash
+curl -i "https://[host]/items/[hash].svg"
+```
+
+Record:
+
+```text
+Parser-failure upload accepted: yes/no
+Content-Type changed to text/html: yes/no
+Script preserved only on malformed upload: yes/no
+```
+
 ## 5. Test PNG Polyglot Second
 
 ```bash
@@ -158,6 +180,7 @@ Execution happened because file was served as active content from app origin.
 
 - [ ] Upload endpoints and allowed types identified.
 - [ ] SVG script upload tested.
+- [ ] Malformed/unreadable SVG parser-failure path tested when relevant.
 - [ ] Stored object headers and body inspected.
 - [ ] PNG polyglot / override path tested if relevant.
 - [ ] Reviewer bot trigger identified.

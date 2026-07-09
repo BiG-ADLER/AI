@@ -1,5 +1,14 @@
 # Rolodex Source Map Token Leak
 
+## Confirmed Instances
+
+| Date | Host |
+|------|------|
+| 2026-06-06 | earlier pwnbox instance |
+| 2026-07-09 | `https://e6d594d3b237.pwnbox-lab.com/` |
+
+Same bundle hashes (`index-DPm9vOq3.js`, `index-Ct_kMsSy.css`) and exploit chain on both runs.
+
 ## What Is Happening
 
 The Rolodex lab is a React single-page app backed by Express. The page loads a production JavaScript bundle, but the matching source map is also publicly accessible.

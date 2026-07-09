@@ -96,12 +96,20 @@ SVG is XML. If the app stores and serves it from the first-party origin without 
 ## Escalation Order
 
 1. Test `.svg` with inline script
-2. Trigger reviewer bot on uploaded hash
-3. Exfiltrate `document.cookie`
-4. If SVG blocked, test PNG polyglot
-5. If object storage clues exist, test `?response-content-type=text/html`
+2. If sanitized, test malformed / unclosed `.svg` for parser-failure storage
+3. Trigger reviewer bot on uploaded hash
+4. Exfiltrate `document.cookie`
+5. If SVG blocked, test PNG polyglot
+6. If object storage clues exist, test `?response-content-type=text/html`
 
 ## Related Pattern
+
+If well-formed SVG is sanitized, switch to:
+
+```text
+payloads/xss/malformed-svg-parser-failure-upload.md
+notes/upload-parser-failure-svg-left-alone.md
+```
 
 If SVG fails but PNG uploads work and responses include S3-style headers, switch to:
 

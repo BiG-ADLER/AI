@@ -176,7 +176,21 @@ The confirmed security bug is missing authorization on the sensitive endpoint.
 - Rotate exposed credentials.
 - Add regression tests for unauthenticated and low-privileged access.
 
-## 10. Decision Checklist
+## 10. Known Lab Template
+
+Rolodex / Source Maps style labs often follow:
+
+```text
+public .js.map
+-> USER_LOGS = '/api/users/logs' in sourcesContent
+-> unauthenticated token JSON
+-> admin token cookie replay
+-> admin SVG/CSS-hidden path such as /twleoknsdcsbu
+```
+
+Still validate each step; do not skip auth and content-type checks.
+
+## 11. Decision Checklist
 
 - [ ] Source map is confirmed reachable.
 - [ ] Interesting source content is extracted.
