@@ -131,6 +131,8 @@ For DOM/client-side XSS, trace the full path.
 - object.data
 - embed.src
 - template.innerHTML
+- Dedicated Worker `eval` / `Function` on path or `postMessage` data
+- Cache API `put` of SW-cached main-thread scripts (`/static/*.js`)
 
 ### Safer sinks to prefer
 
@@ -442,6 +444,7 @@ Common root causes:
 - server trusts client-side validation
 - double decoding after validation
 - filter strips dangerous strings but leaves dangerous structure
+- HTML allowlist keeps `body`/`html` and misses uncommon `on*` handlers (e.g. `onhashchange`)
 - CSP missing or weak
 - framework escape bypass used unsafely
 - uploaded SVG served as active content
@@ -474,6 +477,8 @@ Fix based on context.
 - Remove event handlers.
 - Remove dangerous URL schemes.
 - Restrict SVG/MathML unless needed.
+- Disallow `body`/`html`/`head` in user content.
+- Fuzz uncommon handlers (`onhashchange`, `onbeforetoggle`, …) — not only `onload`/`onclick`.
 - Sanitize after final decoding.
 
 ### URLs
@@ -549,6 +554,7 @@ Before reporting, confirm:
 - [ ] JavaScript execution is confirmed, or limitation is clearly stated.
 - [ ] CSP behavior is checked.
 - [ ] Cookie/session limitations are checked.
+- [ ] If Worker + SW cache: Cache API poison and same-browser-profile delivery were tested (separate bot visits often reset cache).
 - [ ] Impact is realistic.
 - [ ] Steps are minimal and reproducible.
 - [ ] Root cause is explained.

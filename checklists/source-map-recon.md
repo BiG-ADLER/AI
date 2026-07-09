@@ -188,7 +188,17 @@ public .js.map
 -> admin SVG/CSS-hidden path such as /twleoknsdcsbu
 ```
 
-Still validate each step; do not skip auth and content-type checks.
+Acme Intranet / session-tied IDOR + source maps often follow:
+
+```text
+login demo/demo
+-> /js/app.bundle.js + public .js.map
+-> unused adminInfo.js in sourcesContent
+-> GET /api/v1/admin/profile?principal=1
+-> secret field for Mira (#1, admin)
+```
+
+Still validate each step; do not skip auth and content-type checks. Search maps for `principal`, `secret`, and `/api/v1/admin` as well as generic `/api/`.
 
 ## 11. Decision Checklist
 

@@ -107,3 +107,15 @@ HTML -> JS assets -> source maps -> sourcesContent -> hidden endpoints -> real e
 - admin-only SVG at `/twleoknsdcsbu` referenced from CSS
 
 See `writeups/rolodex-source-map-token-leak.md` and dated lab notes under `labs/`.
+
+**Acme Intranet** (session-tied IDOR + source maps) also ships a public map next to a single esbuild bundle:
+
+```text
+/js/app.bundle.js
+/js/app.bundle.js.map
+-> sourcesContent includes unused adminInfo.js
+-> GET /api/v1/admin/profile?principal=<id>
+-> authenticated IDOR on secret field (Mira #1)
+```
+
+Here the map is for **endpoint discovery**; the confirmed bug is missing object-level authorization, not the map alone. See `writeups/acme-intranet-session-tied-idor.md`.
