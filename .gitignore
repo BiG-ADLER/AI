@@ -1,3 +1,4 @@
-.cursor/rules/read-agents-md.mdc
+# Local Cursor rules — per-developer, not shared via repo
+.cursor/rules/
+
 .DS_Store
-.cursor/rules/read-agents-md.mdc
