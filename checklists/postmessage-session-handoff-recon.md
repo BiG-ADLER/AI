@@ -74,12 +74,22 @@ Exact origin compare: yes/no
 
 ## 5. Build Minimal Forgery
 
-Test with one forged origin at a time:
+Test with one forged origin at a time.
+
+String parser confusion:
 
 ```text
 https://trusted.example@attacker.tld
 https://trusted.example.evil.tld
 https://trusted.example:443@attacker.tld
+```
+
+Array / `targetOrigin` confusion when validation uses `new URL(origin)` and the sink reuses the same value:
+
+```javascript
+const origin = ['https://trusted.example'];
+origin.targetOrigin = location.origin;
+iframe.contentWindow.postMessage({ origin }, '*');
 ```
 
 Prefer a harmless local callback first.
@@ -88,16 +98,17 @@ Record:
 
 ```text
 Forged origin:
+Bypass family: string parser / array targetOrigin / other
 Accepted by validator: yes/no
 Reply delivered: yes/no
 ```
 
 ## 6. Check iframe vs Popup Behavior
 
-Test both delivery contexts:
+Match delivery context to the sink:
 
-- iframe/embed
-- popup/top-level handoff page
+- use iframe when the widget calls `window.parent.postMessage`
+- use popup when the widget calls `window.opener.postMessage`
 
 Document whether third-party cookie restrictions change the result.
 
@@ -160,6 +171,7 @@ What secret was returned:
 - [ ] postMessage listener reviewed.
 - [ ] `event.origin` vs `event.data.origin` distinction captured.
 - [ ] One forged origin tested.
+- [ ] Array/object `targetOrigin` confusion tested when `new URL(origin)` is used.
 - [ ] iframe vs popup behavior compared.
 - [ ] Review flow confirmed if needed.
 - [ ] Minimal proof captured.

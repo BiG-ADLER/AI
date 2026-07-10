@@ -43,6 +43,8 @@ var iv = setInterval(function() {
 
 If the provider relies on ambient cookies, iframes may receive an empty session due to third-party cookie restrictions. A popup or top-level handoff page often carries the real authenticated cookie.
 
+If the sink is `window.parent.postMessage`, use an iframe instead. For exact hostname allowlists that block userinfo strings, try the array `targetOrigin` bypass in `postmessage-array-targetorigin-bypass.md`.
+
 ## Why It Works
 
 The widget should trust `event.origin`, but instead trusts a self-declared origin inside `event.data`. If it reuses that claimed value as `postMessage` `targetOrigin`, browser parsing can deliver the reply to the attacker's real origin.

