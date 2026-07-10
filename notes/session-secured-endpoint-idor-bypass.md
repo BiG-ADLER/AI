@@ -25,10 +25,14 @@ Look for flows where:
 Common examples:
 
 ```text
-GET /api/me                 -> derives user from session
-GET /api/users/123          -> accepts raw id
-GET /api/teamMemberInfo/1   -> accepts raw id
+GET /api/me                              -> derives user from session
+GET /api/v1/user/me                      -> derives user from session
+GET /api/users/123                       -> accepts raw id
+GET /api/teamMemberInfo/1                -> accepts raw id
+GET /api/v1/admin/profile?principal=1    -> accepts raw id (odd param name)
 ```
+
+When the UI ships a single minified bundle, also fetch the matching `.js.map` — unused modules (admin/team helpers) often survive in `sourcesContent` even when not mounted at runtime.
 
 ## Pattern
 
@@ -102,4 +106,15 @@ Unsigned or tampered sessions must still fail authentication.
 
 ## Future Checklist Item
 
-When a lab or app says the id is session-tied, test that claim only on the endpoint mentioned — then immediately hunt for other endpoints that still accept raw ids in paths, query strings, or JSON bodies.
+When a lab or app says the id is session-tied, test that claim only on the endpoint mentioned — then immediately hunt for other endpoints that still accept raw ids in paths, query strings, or JSON bodies. Odd parameter names (`principal`, `subject`, `account`) count.
+
+## Recurring Lab Pattern
+
+**Acme Intranet** (pwnbox IDOR / Source-Maps themed) confirmed in two packaging forms:
+
+| Packaging | Discovery | IDOR |
+|-----------|-----------|------|
+| Separate `/js/team.js` | file comments | `/api/teamMemberInfo/:id` |
+| Single `/js/app.bundle.js` + public `.map` | `sourcesContent` (`adminInfo.js`) | `/api/v1/admin/profile?principal=` |
+
+UI hint **Mira (#1, admin)** is the high-value id. See `writeups/acme-intranet-session-tied-idor.md` and dated `labs/` notes.

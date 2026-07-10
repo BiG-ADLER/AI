@@ -66,3 +66,14 @@ The alternate endpoint authenticates the caller but authorizes access using only
 ## Defensive Note
 
 Authentication and object-level authorization are separate controls. Every endpoint that accepts an object id needs an explicit ownership or role check.
+
+## Related Variant
+
+Query-param form (Acme esbuild + source map instances):
+
+```bash
+curl -sS -b cookies.txt \
+  'https://[host]/api/v1/admin/profile?principal=1'
+```
+
+See `payloads/idor/admin-profile-principal-query.md`.

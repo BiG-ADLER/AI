@@ -63,9 +63,11 @@ Unknown pieces:
 Test one parser assumption at a time:
 
 - userinfo: `allowed.example@127.0.0.1`
-- fragments: `internal/path#`
+- reverse userinfo: `127.0.0.1@allowed.example`
+- backslash before `@`: `http://127.0.0.1:port\@allowed.example/`
+- fragments: `internal/path#` or `http://127.0.0.1/#https://allowed/`
 - encoded slash: `%2f`
-- backslash: `\`
+- encoded backslash: `%5c`
 - mixed slash/backslash: `\/`
 - IPv6 loopback: `[::1]`
 - integer IP forms
@@ -79,6 +81,8 @@ What validator likely sees:
 What executor likely connects to:
 Evidence:
 ```
+
+See also: `notes/ssrf-backslash-userinfo-allowlist-bypass.md`, `payloads/ssrf/backslash-at-allowlist-loopback-bypass.md`
 
 ## 5. Look For Response Oracles
 

@@ -176,7 +176,31 @@ The confirmed security bug is missing authorization on the sensitive endpoint.
 - Rotate exposed credentials.
 - Add regression tests for unauthenticated and low-privileged access.
 
-## 10. Decision Checklist
+## 10. Known Lab Template
+
+Rolodex / Source Maps style labs often follow:
+
+```text
+public .js.map
+-> USER_LOGS = '/api/users/logs' in sourcesContent
+-> unauthenticated token JSON
+-> admin token cookie replay
+-> admin SVG/CSS-hidden path such as /twleoknsdcsbu
+```
+
+Acme Intranet / session-tied IDOR + source maps often follow:
+
+```text
+login demo/demo
+-> /js/app.bundle.js + public .js.map
+-> unused adminInfo.js in sourcesContent
+-> GET /api/v1/admin/profile?principal=1
+-> secret field for Mira (#1, admin)
+```
+
+Still validate each step; do not skip auth and content-type checks. Search maps for `principal`, `secret`, and `/api/v1/admin` as well as generic `/api/`.
+
+## 11. Decision Checklist
 
 - [ ] Source map is confirmed reachable.
 - [ ] Interesting source content is extracted.

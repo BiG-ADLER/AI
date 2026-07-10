@@ -99,8 +99,9 @@ http://127.0.0.1:[port]/[internal-path]#https://[allowed-host]/
 | Userinfo | `allowed@127.0.0.1` | `@` accepted; parser splits authority |
 | Fragment allowlist smuggling | `127.0.0.1#https://allowed/` | substring or `startsWith` allowlist |
 | Fragment path control | `allowed@127.0.0.1/path#` | server appends suffix after user input |
+| Backslash + `@` | `http://127.0.0.1\@allowed/` | `\` confuses host check vs HTTP client |
 
-These can coexist in one app but are separate root causes.
+These can coexist in one app but are separate root causes. When fragment and classic userinfo fail, still test backslash forms — see `notes/ssrf-backslash-userinfo-allowlist-bypass.md`.
 
 ## Why Failed Tests Fail
 

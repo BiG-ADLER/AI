@@ -67,9 +67,10 @@ Authentication bypassed: yes/no
 Search:
 
 - all loaded and unloaded JavaScript bundles
-- `team.js`, `admin.js`, `directory.js`, feature-flagged widgets
+- matching `.js.map` / `sourcesContent` when the UI ships a single minified bundle
+- `team.js`, `admin.js`, `adminInfo.js`, `directory.js`, feature-flagged widgets
 - OpenAPI/Swagger, GraphQL schema, HTML comments, announcement metadata
-- paths containing `:id`, `userId`, `memberId`, `accountId`
+- paths/queries containing `:id`, `userId`, `memberId`, `accountId`, `principal`, `uid`
 
 Record:
 
@@ -78,6 +79,7 @@ Alternate endpoint:
 Parameter location:
 Documented sensitive fields:
 Invoked by current page: yes/no
+Discovered via: separate JS / source map / docs
 ```
 
 ## 6. Enumerate Object Ids
@@ -135,7 +137,9 @@ Examples:
 - [ ] Primary profile route tested.
 - [ ] Session tampering ruled out or confirmed.
 - [ ] JavaScript and docs scanned for alternate id routes.
-- [ ] At least one foreign id tested.
+- [ ] If only a minified bundle ships, `.js.map` / `sourcesContent` checked.
+- [ ] Odd param names (`principal`, etc.) tested, not only `id`.
+- [ ] At least one foreign id tested (prefer UI hints like `#1, admin`).
 - [ ] IDOR confirmed or ruled out.
 - [ ] Root cause documented as inconsistent authorization.
 - [ ] Reusable notes exclude live secrets.

