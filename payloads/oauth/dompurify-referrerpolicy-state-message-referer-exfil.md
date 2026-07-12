@@ -17,6 +17,7 @@ Do **not** use when:
 
 - sl2-style staged code works (`GET /auth` alone) — try CSRF first
 - sl3 `/logger` postMessage channel exists — different chain
+- sl4 Referer trust on missing-code `/callback` (plain hex state, no `/error`) — use `payloads/oauth/referer-trust-missing-code-callback-exfil-review-bot.md`
 
 ## Prerequisites
 

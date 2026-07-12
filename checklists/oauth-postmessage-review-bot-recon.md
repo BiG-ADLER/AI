@@ -195,6 +195,10 @@ Preferred order:
 - use PKCE and one-time state
 - treat reviewer bots with active IdP sessions as high-value OAuth victims
 
+## Related
+
+If `/auth`, `/init`, `/error`, and `/logger` are **all absent** but `/callback` reflects Referer when `code` is missing, use `checklists/oauth-referer-trust-missing-code-recon.md` (sl4 Referer Gate pattern).
+
 ## Decision Checklist
 
 - [ ] OAuth redirect_uri and response_type matrix tested.

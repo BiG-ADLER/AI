@@ -15,6 +15,8 @@ Apply when:
 
 Do **not** use sl3 hybrid+logger template when this staging behavior is present.
 
+Do **not** use when sl4 Referer-trust `/callback` exists (no `/auth`, must steal reviewer code via Referer) — see `payloads/oauth/referer-trust-missing-code-callback-exfil-review-bot.md`.
+
 ## Prerequisites
 
 ```bash

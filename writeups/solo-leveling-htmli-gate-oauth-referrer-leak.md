@@ -109,6 +109,7 @@ OAuth error page treats attacker-controlled `state.message` as HTML after incomp
 | sl1 HTMLi Gate | DOMPurify `referrerpolicy` → Referer leak |
 | sl2 State Gate | OAuth CSRF, server-staged code |
 | sl3 Origin Gate | Hybrid fragment + `/logger` postMessage |
+| sl4 Referer Gate | Referer trust on missing-code `/callback` + multi-account gate (see `writeups/solo-leveling-referer-gate-oauth-referer-leak.md`) |
 
 ## Report Summary
 
