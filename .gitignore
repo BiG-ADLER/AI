@@ -2,3 +2,9 @@
 .cursor/rules/
 
 .DS_Store
+
+# Local agent instructions — per-developer, not shared via repo
+AGENTS.md
+
+# Dependencies
+node_modules/
